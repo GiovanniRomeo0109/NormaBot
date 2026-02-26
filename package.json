@@ -1,0 +1,28 @@
+{
+  "name": "normabot",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev":        "vite",
+    "server":     "node server.js",
+    "start":      "concurrently \"npm run server\" \"npm run dev\"",
+    "build":      "vite build",
+    "preview":    "vite preview"
+  },
+  "dependencies": {
+    "react":          "^18.3.1",
+    "react-dom":      "^18.3.1",
+    "express":        "^4.19.2",
+    "cors":           "^2.8.5",
+    "node-fetch":     "^3.3.2",
+    "dotenv":         "^16.4.5",
+    "concurrently":   "^9.0.1"
+  },
+  "devDependencies": {
+    "@types/react":        "^18.3.3",
+    "@types/react-dom":    "^18.3.0",
+    "@vitejs/plugin-react":"^4.3.1",
+    "vite":                "^5.4.2"
+  }
+}
