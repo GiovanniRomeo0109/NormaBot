@@ -16,8 +16,7 @@ const PORT = process.env.PORT || 3001;
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 
 if (!ANTHROPIC_API_KEY) {
-  console.error("❌  ANTHROPIC_API_KEY mancante nel file .env");
-  process.exit(1);
+  console.warn("⚠️  ANTHROPIC_API_KEY mancante — le chiamate AI restituiranno errore 503");
 }
 
 // CORS dinamico: accetta localhost in sviluppo + dominio Vercel in produzione
@@ -44,11 +43,15 @@ app.get("/health", (_req, res) => {
     status:    "ok",
     timestamp: new Date().toISOString(),
     env:       process.env.NODE_ENV || "development",
+    apiKey:    ANTHROPIC_API_KEY ? "configurata ✅" : "MANCANTE ⚠️",
   });
 });
 
 // ── Proxy principale → Anthropic /v1/messages ──────────────────────
 app.post("/api/claude", async (req, res) => {
+  if (!ANTHROPIC_API_KEY) {
+    return res.status(503).json({ error: "ANTHROPIC_API_KEY non configurata sul server. Aggiungila nelle variabili d'ambiente di Railway." });
+  }
   try {
     const response = await fetch("https://api.anthropic.com/v1/messages", {
       method:  "POST",
