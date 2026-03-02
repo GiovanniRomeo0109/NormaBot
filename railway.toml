@@ -1,10 +1,9 @@
-# ─────────────────────────────────────────────────────────────
-#  NormaBot — Configurazione Railway (backend proxy)
-#  Questo file dice a Railway come avviare il server
-# ─────────────────────────────────────────────────────────────
+# NormaBot - Railway backend proxy
+# buildCommand impedisce a Railway di eseguire npm run build (Vite)
 
 [build]
 builder = "NIXPACKS"
+buildCommand = "npm install --omit=dev"
 
 [deploy]
 startCommand = "node server.js"
