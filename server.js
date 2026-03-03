@@ -1,9 +1,3 @@
-// ─────────────────────────────────────────────────────────────────
-//  NormaBot — Proxy Backend
-//  Locale:      http://localhost:3001
-//  Produzione:  Railway (variabile FRONTEND_URL nel dashboard)
-// ─────────────────────────────────────────────────────────────────
-
 import express from "express";
 import cors    from "cors";
 import fetch   from "node-fetch";
@@ -16,41 +10,35 @@ const PORT = process.env.PORT || 3001;
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 
 if (!ANTHROPIC_API_KEY) {
-  console.warn("⚠️  ANTHROPIC_API_KEY mancante — le chiamate AI restituiranno errore 503");
+  console.warn("⚠️  ANTHROPIC_API_KEY mancante");
 }
 
-// CORS dinamico: accetta localhost in sviluppo + dominio Vercel in produzione
-const ALLOWED_ORIGINS = [
-  "http://localhost:5173",
-  "http://localhost:4173",
-  process.env.FRONTEND_URL,          // es. https://normabot.vercel.app
-].filter(Boolean);
-
-app.use(cors({
-  origin: (origin, cb) => {
-    // Permetti richieste senza origin (es. curl, Postman)
-    if (!origin) return cb(null, true);
-    if (ALLOWED_ORIGINS.includes(origin)) return cb(null, true);
-    cb(new Error(`CORS bloccato per: ${origin}`));
-  }
-}));
+// CORS: accetta tutte le origini in beta, con headers espliciti
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (origin) res.setHeader("Access-Control-Allow-Origin", origin);
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  res.setHeader("Access-Control-Max-Age", "86400");
+  if (req.method === "OPTIONS") return res.sendStatus(204);
+  next();
+});
 
 app.use(express.json({ limit: "2mb" }));
 
-// ── Health check ───────────────────────────────────────────────────
+// ── Health check ──────────────────────────────────────────────────
 app.get("/health", (_req, res) => {
   res.json({
     status:    "ok",
     timestamp: new Date().toISOString(),
-    env:       process.env.NODE_ENV || "development",
     apiKey:    ANTHROPIC_API_KEY ? "configurata ✅" : "MANCANTE ⚠️",
   });
 });
 
-// ── Proxy principale → Anthropic /v1/messages ──────────────────────
+// ── Proxy → Anthropic ─────────────────────────────────────────────
 app.post("/api/claude", async (req, res) => {
   if (!ANTHROPIC_API_KEY) {
-    return res.status(503).json({ error: "ANTHROPIC_API_KEY non configurata sul server. Aggiungila nelle variabili d'ambiente di Railway." });
+    return res.status(503).json({ error: "ANTHROPIC_API_KEY non configurata sul server." });
   }
   try {
     const response = await fetch("https://api.anthropic.com/v1/messages", {
@@ -65,12 +53,10 @@ app.post("/api/claude", async (req, res) => {
     });
 
     const data = await response.json();
-
     if (!response.ok) {
       console.error("Anthropic error:", data);
       return res.status(response.status).json(data);
     }
-
     res.json(data);
   } catch (err) {
     console.error("Proxy error:", err.message);
@@ -79,7 +65,5 @@ app.post("/api/claude", async (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`\n✅  NormaBot proxy attivo su http://localhost:${PORT}`);
-  console.log(`    Origin consentite: ${ALLOWED_ORIGINS.join(", ")}`);
-  console.log(`    → https://api.anthropic.com/v1/messages\n`);
+  console.log(`\n✅  NormaBot proxy attivo su http://localhost:${PORT}\n`);
 });
