@@ -1,0 +1,11 @@
+node_modules
+dist
+src
+public
+.env
+.git
+*.md
+vercel.json
+vite.config.*
+index.html
+crawler

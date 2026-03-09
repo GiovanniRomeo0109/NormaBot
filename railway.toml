@@ -1,9 +1,7 @@
-# NormaBot - Railway backend proxy
-# buildCommand impedisce a Railway di eseguire npm run build (Vite)
-
+# NormaBot — Railway backend proxy
 [build]
-builder = "NIXPACKS"
-buildCommand = "npm install --omit=dev"
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
 
 [deploy]
 startCommand = "node server.js"
