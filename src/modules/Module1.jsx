@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { checkScope, OUT_OF_SCOPE_MESSAGE } from "../guardrails";
 
 const PROXY_URL = import.meta.env.VITE_PROXY_URL || "http://localhost:3001/api/claude";
 
@@ -73,9 +74,10 @@ const QUICK_QUESTIONS = [
   "Ristrutturazione completa con cambio planimetria interna. Nessun vincolo.",
 ];
 
-function TypingIndicator() {
+function TypingIndicator({ checking }) {
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 4, padding: "12px 16px" }}>
+    <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "12px 16px" }}>
+      {checking && <span style={{ fontSize: 10, color: "rgba(201,168,76,0.6)", fontFamily: "'Syne',sans-serif", letterSpacing: 1 }}>Verifico pertinenza...</span>}
       {[0, 0.2, 0.4].map((delay, i) => (
         <span key={i} style={{
           width: 7, height: 7, borderRadius: "50%", background: "#C9A84C", display: "inline-block",
@@ -139,6 +141,7 @@ export default function Module1() {
   }]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [checking, setChecking] = useState(false); // guardrail in corso
   const [showQuick, setShowQuick] = useState(true);
   const bottomRef = useRef(null);
 
@@ -146,21 +149,40 @@ export default function Module1() {
 
   const sendMessage = async (text) => {
     const userText = text || input.trim();
-    if (!userText || loading) return;
+    if (!userText || loading || checking) return;
     const now = new Date().toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" });
-    const newMessages = [...messages, { role: "user", content: userText, time: now }];
-    setMessages(newMessages);
+
+    // Mostra subito il messaggio utente
+    setMessages(prev => [...prev, { role: "user", content: userText, time: now }]);
     setInput("");
-    setLoading(true);
     setShowQuick(false);
+
+    // ── Guardrail: verifica scope prima di chiamare il modello principale ──
+    setChecking(true);
+    const scope = await checkScope(userText);
+    setChecking(false);
+
+    if (scope === "OUT_OF_SCOPE") {
+      setMessages(prev => [...prev, {
+        role: "assistant",
+        content: OUT_OF_SCOPE_MESSAGE,
+        time: new Date().toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" }),
+        isGuardrail: true,
+      }]);
+      return;
+    }
+
+    // ── Domanda in scope: chiama il modello principale ──
+    setLoading(true);
     try {
+      const history = [...messages, { role: "user", content: userText }];
       const res = await fetch(PROXY_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           model: "claude-sonnet-4-20250514", max_tokens: 1000,
           system: SYSTEM_PROMPT,
-          messages: newMessages.map(m => ({ role: m.role, content: m.content }))
+          messages: history.map(m => ({ role: m.role, content: m.content }))
         })
       });
       const data = await res.json();
@@ -223,11 +245,11 @@ export default function Module1() {
         <div style={{ flex: 1, overflowY: "auto", padding: "20px 24px", position: "relative", zIndex: 4 }}>
           <div style={{ maxWidth: 760, margin: "0 auto" }}>
             {messages.map((msg, i) => <MessageBubble key={i} msg={msg} />)}
-            {loading && (
+            {(loading || checking) && (
               <div style={{ display: "flex", alignItems: "flex-start", gap: 12, marginBottom: 20 }}>
                 <div style={{ width: 34, height: 34, borderRadius: "50%", background: "linear-gradient(135deg, #C9A84C, #8B6914)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15 }}>⚖️</div>
                 <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: "4px 16px 16px 16px" }}>
-                  <TypingIndicator />
+                  <TypingIndicator checking={checking} />
                 </div>
               </div>
             )}
